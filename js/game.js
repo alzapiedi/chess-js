@@ -66,7 +66,7 @@ Game.prototype.setEnd = function (pos) {
   var board = this.board;
   var piece = board.piece(this.startPos);
   if (piece.validMove(pos)) {
-    this.display.unselect();
+    this.display.unselect(); 
     board.move(this.startPos, pos);
     this.switchTurns();
     this.display.render();
