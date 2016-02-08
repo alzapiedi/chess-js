@@ -24,11 +24,19 @@ Game.prototype.setStart = function (pos) {
     this.startPos = pos;
     this.display.select(pos);
     var piece = this.board.piece(pos);
-    piece.moves().forEach(function (move) {
-      if (!piece.moveIntoCheck(move)) {
-        this.display.select(move);
-      }
-    }.bind(this));
+    if (piece.toString() === "king") {
+      piece.moves().forEach(function (move) {
+        if (!piece.moveThroughCheck(move)) {
+          this.display.select(move);
+        }
+      }.bind(this));
+    } else {
+      piece.moves().forEach(function (move) {
+        if (!piece.moveIntoCheck(move)) {
+          this.display.select(move);
+        }
+      }.bind(this));
+    }
     this.chooseEnd();
   } else if (!this.board.isOccupied(pos)) {
     this.chooseMove();
@@ -90,5 +98,6 @@ Game.prototype.setEnd = function (pos) {
 
 document.addEventListener('DOMContentLoaded', function () {
   var g = new Game();
+  window.g = g;
   g.chooseMove();
 });

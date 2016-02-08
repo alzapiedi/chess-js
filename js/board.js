@@ -3,6 +3,7 @@ var Pieces = require('./pieces'),
 
 var Board = function () {
   this.grid = [];
+  this.cloned = false;
   for (var i = 0; i < 8; i++) {
     this.grid.push([null,null,null,null,null,null,null,null]);
   }
@@ -75,9 +76,30 @@ Board.prototype.inCheck = function (color) {
 
 Board.prototype.move = function (startPos, endPos) {
   var piece = this.piece(startPos);
+  piece.moved = true;
+  if (piece.toString() === "pawn" && Math.abs(endPos[1] - startPos[1]) === 1 && !this.isOccupied(endPos)) {
+    if (piece.color === "white") {
+      this.grid[endPos[0] + 1][endPos[1]] = null;
+    } else {
+      this.grid[endPos[0] - 1][endPos[1]] = null;
+    }
+  }
+  if (piece.toString() === "king" && endPos[1] - startPos[1] === 2) {
+    var rook = this.piece([startPos[0], 7]);
+    rook.setPos([startPos[0], 5]);
+    this.grid[startPos[0]][5] = rook;
+  }
+  if (piece.toString() === "king" && endPos[1] - startPos[1] === -2) {
+    var rook = this.piece([startPos[0], 0])
+    rook.setPos([startPos[0], 3]);
+    this.grid[startPos[0]][3] = rook;
+  }
   piece.setPos(endPos);
   this.grid[endPos[0]][endPos[1]] = piece;
   this.grid[startPos[0]][startPos[1]] = null;
+  if (piece.toString() === "pawn" && Math.abs(endPos[0] - startPos[0]) === 2) {
+    piece.setPassant();
+  }
 }
 
 Board.prototype.inBounds = function (pos) {

@@ -22,7 +22,6 @@ Piece.prototype.getAttr = function () {
 
 Piece.prototype.validMove = function (pos) {
   var moves = this.moves();
-  // debugger;
   for (var i = 0; i < moves.length; i++) {
     if (Utils.arrayEquals(moves[i], pos) && !this.moveIntoCheck(pos)) {
       return true;
@@ -30,9 +29,11 @@ Piece.prototype.validMove = function (pos) {
   }
   return false;
 }
+
 Piece.prototype.moveIntoCheck = function (endPos) {
   var color = this.color;
   var testBoard = this.board.clone();
+  testBoard.cloned = true;
   testBoard.move(this.pos, endPos);
   return testBoard.inCheck(color);
 }
@@ -43,6 +44,7 @@ var Pawn = function (attrs) {
   this.pos = attrs.pos;
   this.moves = Stepping.moves.bind(this);
   this.board.setPiece(this);
+  this.passant = false;
 }
 
 Utils.inherits(Pawn, Piece);
@@ -60,17 +62,51 @@ Pawn.prototype.getMoveDirs = function () {
   var left = [this.pos[0] + direction, this.pos[1] - 1];
   var right = [this.pos[0] + direction, this.pos[1] + 1];
   var b = this.board;
-  if (b.inBounds(left) && b.isOccupied(left) && b.piece(left).color !== this.color) {
+  if ((b.inBounds(left) && b.isOccupied(left) && b.piece(left).color !== this.color)) {
     deltas.push([direction, -1]);
   }
-  if (b.inBounds(right) && b.isOccupied(right) && b.piece(right).color !== this.color) {
+  if ((b.inBounds(right) && b.isOccupied(right) && b.piece(right).color !== this.color)) {
     deltas.push([direction, 1]);
   }
+  if (this.passantAdjacent()) {
+    deltas.push([direction, this.passantAdjacent()]);
+  }
   return deltas;
-
 }
+
+Pawn.prototype.setPassant = function () {
+  this.passant = this.pawnLeft() || this.pawnRight();
+}
+
 Pawn.prototype.toString = function () {
   return "pawn";
+}
+
+Pawn.prototype.pawnLeft = function () {
+  var posLeft = [this.pos[0], this.pos[1] - 1];
+  if (this.board.inBounds(posLeft) && this.board.isOccupied(posLeft) && this.board.piece(posLeft).color !== this.color && this.board.piece(posLeft).toString() === "pawn") {
+    return true;
+  }
+  return false;
+}
+
+Pawn.prototype.pawnRight = function () {
+  var posRight = [this.pos[0], this.pos[1] + 1];
+  if (this.board.inBounds(posRight) && this.board.isOccupied(posRight) && this.board.piece(posRight).color !== this.color && this.board.piece(posRight).toString() === "pawn") {
+    return true;
+  }
+  return false;
+}
+
+Pawn.prototype.passantAdjacent = function () {
+  var posLeft = [this.pos[0], this.pos[1] - 1];
+  var posRight = [this.pos[0], this.pos[1] + 1];
+  if (this.pawnLeft() && this.board.piece(posLeft).passant) {
+    return -1;
+  } else if (this.pawnRight() && this.board.piece(posRight).passant) {
+    return 1;
+  }
+  return false;
 }
 
 var Bishop = function (attrs) {
@@ -110,6 +146,7 @@ var Rook = function (attrs) {
   this.pos = attrs.pos;
   this.moves = Sliding.moves.bind(this);
   this.board.setPiece(this);
+  this.moved = false;
 }
 Utils.inherits(Rook, Piece);
 Rook.prototype.getMoveDirs = function () {
@@ -141,13 +178,57 @@ var King = function (attrs) {
   this.pos = attrs.pos;
   this.moves = Stepping.moves.bind(this);
   this.board.setPiece(this);
+  this.moved = false;
 }
 Utils.inherits(King, Piece);
 King.prototype.getMoveDirs = function () {
-  return Piece.CARDINALS.concat(Piece.DIAGONALS);
+  var deltas = Piece.CARDINALS.concat(Piece.DIAGONALS);
+  var clearLeft = (!this.board.isOccupied([this.pos[0], this.pos[1] - 1]) &&
+                    !this.board.isOccupied([this.pos[0], this.pos[1] - 2]) &&
+                    !this.board.isOccupied([this.pos[0], this.pos[1] - 3]));
+  var clearRight = (!this.board.isOccupied([this.pos[0], this.pos[1] + 1]) &&
+                    !this.board.isOccupied([this.pos[0], this.pos[1] + 2]));
+  var castleLeft = clearLeft &&
+                    !this.moved &&
+                    this.board.piece([this.pos[0], 0]) &&
+                    this.board.piece([this.pos[0], 0]).toString() === "rook" &&
+                    !this.board.piece([this.pos[0], 0]).moved;
+  var castleRight = clearRight &&
+                    !this.moved &&
+                    this.board.piece([this.pos[0], 7]) &&
+                    this.board.piece([this.pos[0], 7]).toString() === "rook" &&
+                    !this.board.piece([this.pos[0], 7]).moved;
+
+  if (castleLeft) {
+    deltas.push([0, -2]);
+  }
+  if (castleRight) {
+    deltas.push([0, 2]);
+  }
+  return deltas;
+
+}
+King.prototype.validMove = function (pos) {
+  var moves = this.moves();
+  for (var i = 0; i < moves.length; i++) {
+    if (Utils.arrayEquals(moves[i], pos) && !this.moveThroughCheck(pos)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+King.prototype.moveThroughCheck = function (move) {
+  if (Math.abs(this.pos[1] - move[1]) === 2) {
+    var dir = this.pos[1] - move[1] === 1 ? -1 : 1;
+    return this.moveIntoCheck(move) || this.moveIntoCheck([this.pos[0], this.pos[1] + dir]);
+  } else {
+    return this.moveIntoCheck(move);
+  }
+
 }
 King.prototype.toString = function () {
-return "king";
+  return "king";
 }
 
 module.exports = {

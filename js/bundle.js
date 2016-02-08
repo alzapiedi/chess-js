@@ -70,11 +70,19 @@
 	    this.startPos = pos;
 	    this.display.select(pos);
 	    var piece = this.board.piece(pos);
-	    piece.moves().forEach(function (move) {
-	      if (!piece.moveIntoCheck(move)) {
-	        this.display.select(move);
-	      }
-	    }.bind(this));
+	    if (piece.toString() === "king") {
+	      piece.moves().forEach(function (move) {
+	        if (!piece.moveThroughCheck(move)) {
+	          this.display.select(move);
+	        }
+	      }.bind(this));
+	    } else {
+	      piece.moves().forEach(function (move) {
+	        if (!piece.moveIntoCheck(move)) {
+	          this.display.select(move);
+	        }
+	      }.bind(this));
+	    }
 	    this.chooseEnd();
 	  } else if (!this.board.isOccupied(pos)) {
 	    this.chooseMove();
@@ -136,6 +144,7 @@
 	
 	document.addEventListener('DOMContentLoaded', function () {
 	  var g = new Game();
+	  window.g = g;
 	  g.chooseMove();
 	});
 
@@ -200,8 +209,8 @@
 	Display.prototype.selectPos = function (callback) {
 	  this.selectListener = $('.chess-grid').on('click', function (e) {
 	    $('#errors').html("");
-	    this.selectListener.off('click');
-	    callback($(e.target).data("pos"));
+	    var pos = $(e.target).data("pos");
+	    pos && this.selectListener.off('click') && callback(pos);
 	  }.bind(this))
 	
 	}
@@ -235,6 +244,7 @@
 	
 	var Board = function () {
 	  this.grid = [];
+	  this.cloned = false;
 	  for (var i = 0; i < 8; i++) {
 	    this.grid.push([null,null,null,null,null,null,null,null]);
 	  }
@@ -307,9 +317,30 @@
 	
 	Board.prototype.move = function (startPos, endPos) {
 	  var piece = this.piece(startPos);
+	  piece.moved = true;
+	  if (piece.toString() === "pawn" && Math.abs(endPos[1] - startPos[1]) === 1 && !this.isOccupied(endPos)) {
+	    if (piece.color === "white") {
+	      this.grid[endPos[0] + 1][endPos[1]] = null;
+	    } else {
+	      this.grid[endPos[0] - 1][endPos[1]] = null;
+	    }
+	  }
+	  if (piece.toString() === "king" && endPos[1] - startPos[1] === 2) {
+	    var rook = this.piece([startPos[0], 7]);
+	    rook.setPos([startPos[0], 5]);
+	    this.grid[startPos[0]][5] = rook;
+	  }
+	  if (piece.toString() === "king" && endPos[1] - startPos[1] === -2) {
+	    var rook = this.piece([startPos[0], 0])
+	    rook.setPos([startPos[0], 3]);
+	    this.grid[startPos[0]][3] = rook;
+	  }
 	  piece.setPos(endPos);
 	  this.grid[endPos[0]][endPos[1]] = piece;
 	  this.grid[startPos[0]][startPos[1]] = null;
+	  if (piece.toString() === "pawn" && Math.abs(endPos[0] - startPos[0]) === 2) {
+	    piece.setPassant();
+	  }
 	}
 	
 	Board.prototype.inBounds = function (pos) {
@@ -405,7 +436,6 @@
 	
 	Piece.prototype.validMove = function (pos) {
 	  var moves = this.moves();
-	  // debugger;
 	  for (var i = 0; i < moves.length; i++) {
 	    if (Utils.arrayEquals(moves[i], pos) && !this.moveIntoCheck(pos)) {
 	      return true;
@@ -413,9 +443,11 @@
 	  }
 	  return false;
 	}
+	
 	Piece.prototype.moveIntoCheck = function (endPos) {
 	  var color = this.color;
 	  var testBoard = this.board.clone();
+	  testBoard.cloned = true;
 	  testBoard.move(this.pos, endPos);
 	  return testBoard.inCheck(color);
 	}
@@ -426,6 +458,7 @@
 	  this.pos = attrs.pos;
 	  this.moves = Stepping.moves.bind(this);
 	  this.board.setPiece(this);
+	  this.passant = false;
 	}
 	
 	Utils.inherits(Pawn, Piece);
@@ -443,17 +476,51 @@
 	  var left = [this.pos[0] + direction, this.pos[1] - 1];
 	  var right = [this.pos[0] + direction, this.pos[1] + 1];
 	  var b = this.board;
-	  if (b.inBounds(left) && b.isOccupied(left) && b.piece(left).color !== this.color) {
+	  if ((b.inBounds(left) && b.isOccupied(left) && b.piece(left).color !== this.color)) {
 	    deltas.push([direction, -1]);
 	  }
-	  if (b.inBounds(right) && b.isOccupied(right) && b.piece(right).color !== this.color) {
+	  if ((b.inBounds(right) && b.isOccupied(right) && b.piece(right).color !== this.color)) {
 	    deltas.push([direction, 1]);
 	  }
+	  if (this.passantAdjacent()) {
+	    deltas.push([direction, this.passantAdjacent()]);
+	  }
 	  return deltas;
-	
 	}
+	
+	Pawn.prototype.setPassant = function () {
+	  this.passant = this.pawnLeft() || this.pawnRight();
+	}
+	
 	Pawn.prototype.toString = function () {
 	  return "pawn";
+	}
+	
+	Pawn.prototype.pawnLeft = function () {
+	  var posLeft = [this.pos[0], this.pos[1] - 1];
+	  if (this.board.inBounds(posLeft) && this.board.isOccupied(posLeft) && this.board.piece(posLeft).color !== this.color && this.board.piece(posLeft).toString() === "pawn") {
+	    return true;
+	  }
+	  return false;
+	}
+	
+	Pawn.prototype.pawnRight = function () {
+	  var posRight = [this.pos[0], this.pos[1] + 1];
+	  if (this.board.inBounds(posRight) && this.board.isOccupied(posRight) && this.board.piece(posRight).color !== this.color && this.board.piece(posRight).toString() === "pawn") {
+	    return true;
+	  }
+	  return false;
+	}
+	
+	Pawn.prototype.passantAdjacent = function () {
+	  var posLeft = [this.pos[0], this.pos[1] - 1];
+	  var posRight = [this.pos[0], this.pos[1] + 1];
+	  if (this.pawnLeft() && this.board.piece(posLeft).passant) {
+	    return -1;
+	  } else if (this.pawnRight() && this.board.piece(posRight).passant) {
+	    return 1;
+	  }
+	  return false;
 	}
 	
 	var Bishop = function (attrs) {
@@ -493,6 +560,7 @@
 	  this.pos = attrs.pos;
 	  this.moves = Sliding.moves.bind(this);
 	  this.board.setPiece(this);
+	  this.moved = false;
 	}
 	Utils.inherits(Rook, Piece);
 	Rook.prototype.getMoveDirs = function () {
@@ -524,13 +592,57 @@
 	  this.pos = attrs.pos;
 	  this.moves = Stepping.moves.bind(this);
 	  this.board.setPiece(this);
+	  this.moved = false;
 	}
 	Utils.inherits(King, Piece);
 	King.prototype.getMoveDirs = function () {
-	  return Piece.CARDINALS.concat(Piece.DIAGONALS);
+	  var deltas = Piece.CARDINALS.concat(Piece.DIAGONALS);
+	  var clearLeft = (!this.board.isOccupied([this.pos[0], this.pos[1] - 1]) &&
+	                    !this.board.isOccupied([this.pos[0], this.pos[1] - 2]) &&
+	                    !this.board.isOccupied([this.pos[0], this.pos[1] - 3]));
+	  var clearRight = (!this.board.isOccupied([this.pos[0], this.pos[1] + 1]) &&
+	                    !this.board.isOccupied([this.pos[0], this.pos[1] + 2]));
+	  var castleLeft = clearLeft &&
+	                    !this.moved &&
+	                    this.board.piece([this.pos[0], 0]) &&
+	                    this.board.piece([this.pos[0], 0]).toString() === "rook" &&
+	                    !this.board.piece([this.pos[0], 0]).moved;
+	  var castleRight = clearRight &&
+	                    !this.moved &&
+	                    this.board.piece([this.pos[0], 7]) &&
+	                    this.board.piece([this.pos[0], 7]).toString() === "rook" &&
+	                    !this.board.piece([this.pos[0], 7]).moved;
+	
+	  if (castleLeft) {
+	    deltas.push([0, -2]);
+	  }
+	  if (castleRight) {
+	    deltas.push([0, 2]);
+	  }
+	  return deltas;
+	
+	}
+	King.prototype.validMove = function (pos) {
+	  var moves = this.moves();
+	  for (var i = 0; i < moves.length; i++) {
+	    if (Utils.arrayEquals(moves[i], pos) && !this.moveThroughCheck(pos)) {
+	      return true;
+	    }
+	  }
+	  return false;
+	}
+	
+	King.prototype.moveThroughCheck = function (move) {
+	  if (Math.abs(this.pos[1] - move[1]) === 2) {
+	    var dir = this.pos[1] - move[1] === 1 ? -1 : 1;
+	    return this.moveIntoCheck(move) || this.moveIntoCheck([this.pos[0], this.pos[1] + dir]);
+	  } else {
+	    return this.moveIntoCheck(move);
+	  }
+	
 	}
 	King.prototype.toString = function () {
-	return "king";
+	  return "king";
 	}
 	
 	module.exports = {

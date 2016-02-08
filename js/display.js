@@ -54,8 +54,8 @@ Display.prototype.render = function () {
 Display.prototype.selectPos = function (callback) {
   this.selectListener = $('.chess-grid').on('click', function (e) {
     $('#errors').html("");
-    this.selectListener.off('click');
-    callback($(e.target).data("pos"));
+    var pos = $(e.target).data("pos");
+    pos && this.selectListener.off('click') && callback(pos);
   }.bind(this))
 
 }
