@@ -111,6 +111,12 @@ Board.prototype.inBounds = function (pos) {
 }
 
 Board.prototype.clone = function () {
+  var passants = [];
+  this.pieces().forEach(function (piece) {
+    if (piece.toString() === "pawn" && piece.passant) {
+      passants.push(piece.pos);
+    }
+  });
   var pieces = this.pieces().map(function (piece) {
     return piece.getAttr();
   });
@@ -129,6 +135,9 @@ Board.prototype.clone = function () {
     } else if (pieceObj.type === "king") {
       new Pieces.King({color: pieceObj.color, pos: pieceObj.pos, board: clonedBoard});
     }
+  });
+  passants.forEach(function (pos) {
+    clonedBoard.piece(pos).setPassant();
   });
   return clonedBoard;
 }
