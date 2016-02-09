@@ -58,6 +58,7 @@ Board.prototype.findKing = function (color) {
   return pos;
 }
 
+
 Board.prototype.inCheck = function (color) {
   var otherColor = color === "white" ? "black" : "white";
   var moves;
@@ -76,12 +77,15 @@ Board.prototype.inCheck = function (color) {
 
 Board.prototype.move = function (startPos, endPos) {
   var piece = this.piece(startPos);
+  var captured = false;
   piece.moved = true;
   if (piece.toString() === "pawn" && Math.abs(endPos[1] - startPos[1]) === 1 && !this.isOccupied(endPos)) {
     if (piece.color === "white") {
-      this.grid[endPos[0] + 1][endPos[1]] = null;
+      var pos = [endPos[0] + 1, endPos[1]];
+      this.grid[pos[0]][pos[1]] = null;
     } else {
-      this.grid[endPos[0] - 1][endPos[1]] = null;
+      var pos = [endPos[0] - 1, endPos[1]];
+      this.grid[pos[0]][pos[1]] = null;
     }
   }
   if (piece.toString() === "king" && endPos[1] - startPos[1] === 2) {
@@ -107,7 +111,7 @@ Board.prototype.inBounds = function (pos) {
 }
 
 Board.prototype.clone = function () {
-  var pieces = board.pieces().map(function (piece) {
+  var pieces = this.pieces().map(function (piece) {
     return piece.getAttr();
   });
   var clonedBoard = new Board();

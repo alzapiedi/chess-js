@@ -7,7 +7,8 @@ var Game = function () {
   this.display.setupGrid();
   this.display.render();
   this.board = this.display.board;
-  // this.display.selectStartPos();
+  this.display.setListeners(this);
+  this.states = [this.board.clone()];
 }
 
 Game.prototype.chooseMove = function () {
@@ -76,6 +77,7 @@ Game.prototype.setEnd = function (pos) {
   if (piece.validMove(pos)) {
     this.display.unselect();
     board.move(this.startPos, pos);
+    this.states.push(board.clone());
     this.switchTurns();
     this.display.render();
     this.chooseMove();
@@ -92,6 +94,26 @@ Game.prototype.setEnd = function (pos) {
     this.display.unselect();
     this.chooseMove();
   }
+}
+
+Game.prototype.undoMove = function () {
+  if (this.states.length === 1) {
+    this.display.flashError("No moves made");
+  } else {
+    this.states.pop();
+    this.board = this.states[this.states.length - 1].clone();
+    this.switchTurns();
+    this.display.setBoard(this.board);
+    this.display.render();
+    this.chooseMove();
+  }
+}
+
+Game.prototype.newGame = function () {
+  this.display.clearListener();
+  delete this;
+  var g = new Game();
+  g.chooseMove();
 }
 
 

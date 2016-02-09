@@ -4,7 +4,6 @@ var Board = require('./board'),
 var Display = function ($el) {
   this.$el = $el;
   this.board = new Board();
-  window.board = this.board; ///////////  WINDOW
   this.board.populate();
   this.info("White's turn");
 }
@@ -20,6 +19,10 @@ Display.prototype.setupGrid = function () {
     color = color === "white" ? "black" : "white";
   }
   this.$el.html($ul);
+}
+
+Display.prototype.setBoard = function (board) {
+  this.board = board;
 }
 
 Display.prototype.select = function (pos) {
@@ -56,12 +59,22 @@ Display.prototype.selectPos = function (callback) {
     $('#errors').html("");
     var pos = $(e.target).data("pos");
     pos && this.selectListener.off('click') && callback(pos);
-  }.bind(this))
+  }.bind(this));
+}
 
+Display.prototype.setListeners = function (game) {
+    this.undoListener = $('#undo-move').on('click', function () {
+    game.undoMove();
+  });
+    this.newGameListener = $('#new-game').on('click', function () {
+    game.newGame();
+  });
 }
 
 Display.prototype.clearListener = function () {
   this.selectListener && this.selectListener.off('click');
+  this.undoListener && this.undoListener.off('click');
+  this.newGameListener && this.newGameListener.off('click');
 }
 
 Display.prototype.flashError = function (error) {

@@ -53,7 +53,8 @@
 	  this.display.setupGrid();
 	  this.display.render();
 	  this.board = this.display.board;
-	  // this.display.selectStartPos();
+	  this.display.setListeners(this);
+	  this.states = [this.board.clone()];
 	}
 	
 	Game.prototype.chooseMove = function () {
@@ -122,6 +123,7 @@
 	  if (piece.validMove(pos)) {
 	    this.display.unselect();
 	    board.move(this.startPos, pos);
+	    this.states.push(board.clone());
 	    this.switchTurns();
 	    this.display.render();
 	    this.chooseMove();
@@ -138,6 +140,26 @@
 	    this.display.unselect();
 	    this.chooseMove();
 	  }
+	}
+	
+	Game.prototype.undoMove = function () {
+	  if (this.states.length === 1) {
+	    this.display.flashError("No moves made");
+	  } else {
+	    this.states.pop();
+	    this.board = this.states[this.states.length - 1].clone();
+	    this.switchTurns();
+	    this.display.setBoard(this.board);
+	    this.display.render();
+	    this.chooseMove();
+	  }
+	}
+	
+	Game.prototype.newGame = function () {
+	  this.display.clearListener();
+	  delete this;
+	  var g = new Game();
+	  g.chooseMove();
 	}
 	
 	
@@ -159,7 +181,6 @@
 	var Display = function ($el) {
 	  this.$el = $el;
 	  this.board = new Board();
-	  window.board = this.board; ///////////  WINDOW
 	  this.board.populate();
 	  this.info("White's turn");
 	}
@@ -175,6 +196,10 @@
 	    color = color === "white" ? "black" : "white";
 	  }
 	  this.$el.html($ul);
+	}
+	
+	Display.prototype.setBoard = function (board) {
+	  this.board = board;
 	}
 	
 	Display.prototype.select = function (pos) {
@@ -211,12 +236,22 @@
 	    $('#errors').html("");
 	    var pos = $(e.target).data("pos");
 	    pos && this.selectListener.off('click') && callback(pos);
-	  }.bind(this))
+	  }.bind(this));
+	}
 	
+	Display.prototype.setListeners = function (game) {
+	    this.undoListener = $('#undo-move').on('click', function () {
+	    game.undoMove();
+	  });
+	    this.newGameListener = $('#new-game').on('click', function () {
+	    game.newGame();
+	  });
 	}
 	
 	Display.prototype.clearListener = function () {
 	  this.selectListener && this.selectListener.off('click');
+	  this.undoListener && this.undoListener.off('click');
+	  this.newGameListener && this.newGameListener.off('click');
 	}
 	
 	Display.prototype.flashError = function (error) {
@@ -299,6 +334,7 @@
 	  return pos;
 	}
 	
+	
 	Board.prototype.inCheck = function (color) {
 	  var otherColor = color === "white" ? "black" : "white";
 	  var moves;
@@ -317,12 +353,15 @@
 	
 	Board.prototype.move = function (startPos, endPos) {
 	  var piece = this.piece(startPos);
+	  var captured = false;
 	  piece.moved = true;
 	  if (piece.toString() === "pawn" && Math.abs(endPos[1] - startPos[1]) === 1 && !this.isOccupied(endPos)) {
 	    if (piece.color === "white") {
-	      this.grid[endPos[0] + 1][endPos[1]] = null;
+	      var pos = [endPos[0] + 1, endPos[1]];
+	      this.grid[pos[0]][pos[1]] = null;
 	    } else {
-	      this.grid[endPos[0] - 1][endPos[1]] = null;
+	      var pos = [endPos[0] - 1, endPos[1]];
+	      this.grid[pos[0]][pos[1]] = null;
 	    }
 	  }
 	  if (piece.toString() === "king" && endPos[1] - startPos[1] === 2) {
@@ -348,7 +387,7 @@
 	}
 	
 	Board.prototype.clone = function () {
-	  var pieces = board.pieces().map(function (piece) {
+	  var pieces = this.pieces().map(function (piece) {
 	    return piece.getAttr();
 	  });
 	  var clonedBoard = new Board();
