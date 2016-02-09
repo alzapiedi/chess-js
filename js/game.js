@@ -63,7 +63,6 @@ Game.prototype.switchTurns = function () {
 
 Game.prototype.gameOver = function () {
   var winner = this.turn === "white" ? "Black" : "White";
-  this.display.clearListener();
   this.display.info("Checkmate. " + winner + " wins!");
 }
 
